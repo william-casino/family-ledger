@@ -143,7 +143,7 @@
   <input type="password" class="login-input" id="loginInput" maxlength="20" placeholder="密码" />
   <div class="login-error" id="loginError">密码错误</div>
   <button class="login-btn" id="loginBtn">进入</button>
-  <div class="login-hint">密码：1221</div>
+
 </div>
 
 <!-- App -->
@@ -315,6 +315,35 @@ const data = {
   meta: { id: 'main', last_updated: '', next_repayment_target: 70, repayment_amount: 50 }
 };
 
+// ===== 初始资产数据 =====
+const INITIAL_DATA = {
+  assets: [
+    {"id": "a1", "owner": "蔡伟林", "name": "只进不出", "amount": 53, "type": "现金", "note": "Lump Sum 还款专用账户", "updated_at": "2026-04-10"},
+    {"id": "a2", "owner": "蔡伟林", "name": "招行基金", "amount": 8, "type": "基金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a3", "owner": "蔡伟林", "name": "招行理财", "amount": 12, "type": "理财", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a4", "owner": "蔡伟林", "name": "招行现金", "amount": 1.6, "type": "现金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a5", "owner": "蔡伟林", "name": "信诺保险", "amount": 5, "type": "保险", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a6", "owner": "孙泳茵", "name": "股票", "amount": 77.2, "type": "股票", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a7", "owner": "孙泳茵", "name": "支付宝", "amount": 41.7, "type": "基金", "note": "基金+黄金+余额宝", "updated_at": "2026-04-10"},
+    {"id": "a8", "owner": "孙泳茵", "name": "招行基金", "amount": 13.2, "type": "基金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a9", "owner": "孙泳茵", "name": "招行泰康保险", "amount": 36, "type": "保险", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a10", "owner": "孙泳茵", "name": "招行快赎", "amount": 6.3, "type": "现金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a11", "owner": "孙泳茵", "name": "农行卡余额", "amount": 6.3, "type": "现金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a12", "owner": "孙泳茵", "name": "招行卡余额", "amount": 5.5, "type": "现金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a13", "owner": "孙泳茵", "name": "东莞银行卡余额", "amount": 5.3, "type": "现金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a14", "owner": "孙泳茵", "name": "微信基金", "amount": 1.3, "type": "基金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a15", "owner": "孙泳茵", "name": "建行基金", "amount": 0.6, "type": "基金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a16", "owner": "孙泳茵", "name": "东莞农商行余额", "amount": 0.6, "type": "现金", "note": "", "updated_at": "2026-04-10"},
+    {"id": "a17", "owner": "孙泳茵", "name": "建行卡余额", "amount": 0.06, "type": "现金", "note": "", "updated_at": "2026-04-10"}
+  ],
+  liabilities: [
+    {"id": "l1", "name": "9A抵押贷", "principal": 460, "rate": 3.55, "monthly_interest": 1.36, "monthly_payment": 0, "repayment_type": "先息后本", "update_mode": "manual", "due_date": "每年续期", "note": ""},
+    {"id": "l2", "name": "9C抵押贷", "principal": 380, "rate": 3.45, "monthly_interest": 1.09, "monthly_payment": 0, "repayment_type": "先息后本", "update_mode": "manual", "due_date": "3年一续", "note": ""},
+    {"id": "l3", "name": "中海房贷", "principal": 320, "rate": 3.2, "monthly_interest": 0, "monthly_payment": 3.2, "repayment_type": "本息归还", "update_mode": "auto", "due_date": "2035年12月", "note": ""}
+  ],
+  meta: {"last_updated": "2026-04-10", "next_repayment_target": 70, "repayment_amount": 50}
+};
+
 let editingAssetId = null;
 let editingLiabilityId = null;
 let syncInterval = null;
@@ -365,9 +394,21 @@ async function loadFromCloud() {
     
     if (res.ok) {
       const cloudData = await res.json();
-      data.assets = cloudData.assets || [];
-      data.liabilities = cloudData.liabilities || [];
-      data.meta = cloudData.meta || data.meta;
+      // 如果云端数据为空，使用初始数据并上传
+      if (!cloudData.assets || cloudData.assets.length === 0) {
+        data.assets = INITIAL_DATA.assets;
+        data.liabilities = INITIAL_DATA.liabilities;
+        data.meta = INITIAL_DATA.meta;
+        // 上传到云端
+        setTimeout(() => saveToCloud(), 500);
+        showToast('📦 初始化数据已加载');
+      } else {
+        data.assets = cloudData.assets || [];
+        data.liabilities = cloudData.liabilities || [];
+        data.meta = cloudData.meta || data.meta;
+      }
+      // 同时保存到本地作为备份
+      saveToLocalStorage();
       autoUpdateZhonghai();
       renderAll();
       setSyncStatus('synced', '☁️ 已同步');
@@ -376,7 +417,7 @@ async function loadFromCloud() {
     }
   } catch (err) {
     console.error('Cloud load error:', err);
-    // 尝试加载本地数据
+    // 网络失败时加载本地数据
     loadFromLocalStorage();
     renderAll();
     setSyncStatus('error', '⚠️ 离线');
@@ -384,6 +425,9 @@ async function loadFromCloud() {
 }
 
 async function saveToCloud() {
+  // 先保存到本地，防止网络问题丢失
+  saveToLocalStorage();
+  
   setSyncStatus('syncing', '🔄 保存中');
   
   try {
@@ -395,15 +439,14 @@ async function saveToCloud() {
     
     if (res.ok) {
       setSyncStatus('synced', '☁️ 已同步');
-      showToast('✅ 已保存');
+      showToast('✅ 已保存到云端');
     } else {
       throw new Error('Save failed');
     }
   } catch (err) {
     console.error('Cloud save error:', err);
-    saveToLocalStorage();
     setSyncStatus('error', '⚠️ 保存失败');
-    showToast('⚠️ 网络问题，已暂存');
+    showToast('⚠️ 网络问题，已暂存本地');
   }
 }
 
