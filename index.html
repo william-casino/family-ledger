@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>家庭手账</title>
+  <style>
+    :root {
+      --bg: #faf7f2;
+      --card-bg: #ffffff;
+      --primary: #c4956a;
+      --primary-dark: #a67550;
+      --text: #3d2b1f;
+      --text-light: #8b7355;
+      --border: #ede0d4;
+      --success: #6b9b7a;
+      --danger: #c0756a;
+      --shadow: 0 2px 12px rgba(61,43,31,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; max-width: 480px; margin: 0 auto; }
+
+    /* ===== LOADING ===== */
+    .loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .loading-logo { width: 80px; height: 80px; background: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; font-size: 40px; box-shadow: var(--shadow); }
+    .loading-text { font-size: 14px; color: var(--text-light); margin-top: 16px; }
+    .loading-spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin-top: 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== LOGIN ===== */
+    .login-screen { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .login-logo { width: 80px; height: 80px; background: var(--primary); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; font-size: 40px; box-shadow: var(--shadow); }
+    .login-title { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .login-sub { font-size: 14px; color: var(--text-light); margin-bottom: 40px; }
+    .login-input { width: 100%; max-width: 280px; height: 56px; border: 2px solid var(--border); border-radius: 16px; font-size: 24px; text-align: center; letter-spacing: 8px; padding: 0 16px; outline: none; transition: border-color 0.2s; background: var(--card-bg); }
+    .login-input:focus { border-color: var(--primary); }
+    .login-btn { margin-top: 24px; width: 100%; max-width: 280px; height: 52px; background: var(--primary); color: white; border: none; border-radius: 16px; font-size: 16px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .login-btn:hover { opacity: 0.9; }
+    .login-btn:active { opacity: 0.8; }
+    .login-hint { margin-top: 16px; font-size: 12px; color: var(--text-light); }
+    .login-error { color: var(--danger); font-size: 13px; margin-top: 12px; display: none; }
+
+    /* ===== APP SHELL ===== */
+    .app { display: none; height: 100vh; flex-direction: column; }
+    .app.active { display: flex; }
+
+    /* ===== HEADER ===== */
+    .header { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+    .header-title { font-size: 18px; font-weight: 700; }
+    .header-date { font-size: 12px; color: var(--text-light); }
+
+    /* ===== PAGE ===== */
+    .page { display: none; flex: 1; overflow-y: auto; padding: 20px 16px 100px; }
+    .page.active { display: block; }
+
+    /* ===== BOTTOM NAV ===== */
+    .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--card-bg); border-top: 1px solid var(--border); display: flex; z-index: 100; padding-bottom: env(safe-area-inset-bottom); }
+    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 0 12px; cursor: pointer; color: var(--text-light); transition: color 0.2s; border: none; background: none; font-size: 11px; gap: 4px; }
+    .nav-item.active { color: var(--primary); }
+    .nav-item svg { width: 24px; height: 24px; }
+
+    /* ===== CARDS ===== */
+    .card { background: var(--card-bg); border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+    .card-title { font-size: 13px; color: var(--text-light); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* ===== SUMMARY ===== */
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .summary-item { background: var(--card-bg); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); text-align: center; }
+    .summary-label { font-size: 12px; color: var(--text-light); margin-bottom: 6px; }
+    .summary-value { font-size: 22px; font-weight: 700; }
+    .summary-value.positive { color: var(--success); }
+    .summary-value.negative { color: var(--danger); }
+    .summary-value.net { color: var(--primary); }
+    .summary-amount { font-size: 28px; font-weight: 800; }
+
+    /* ===== CHARTS ===== */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .chart-card { background: var(--card-bg); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+    .chart-title { font-size: 12px; color: var(--text-light); margin-bottom: 12px; }
+    .chart-wrap { position: relative; height: 140px; display: flex; align-items: center; justify-content: center; }
+    .chart-center { position: absolute; text-align: center; }
+    .chart-center-amount { font-size: 16px; font-weight: 700; }
+    .chart-center-label { font-size: 11px; color: var(--text-light); }
+    .pie-chart { width: 120px; height: 120px; border-radius: 50%; }
+    .chart-legend { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-label { flex: 1; color: var(--text-light); }
+    .legend-value { font-weight: 600; }
+
+    /* ===== ASSET LIST ===== */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-title { font-size: 15px; font-weight: 700; }
+    .section-total { font-size: 15px; font-weight: 700; color: var(--primary); }
+    .add-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: white; border: none; font-size: 22px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .asset-card { background: var(--card-bg); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 6px rgba(61,43,31,0.06); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: background 0.15s; }
+    .asset-card:active { background: #f5ede3; }
+    .asset-info { display: flex; flex-direction: column; gap: 2px; }
+    .asset-name { font-size: 14px; font-weight: 600; }
+    .asset-type { font-size: 11px; color: var(--text-light); background: var(--bg); padding: 2px 8px; border-radius: 10px; display: inline-block; margin-top: 2px; }
+    .asset-amount { font-size: 16px; font-weight: 700; text-align: right; }
+    .asset-amount small { font-size: 11px; color: var(--text-light); font-weight: 400; }
+    .owner-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-top: 2px; display: inline-block; }
+    .owner-cai { background: #e8f0fe; color: #4a7cc9; }
+    .owner-sun { background: #fce8f0; color: #c94a7c; }
+    .card-footer { font-size: 11px; color: var(--text-light); text-align: center; margin-top: 4px; }
+
+    /* ===== LIABILITY ===== */
+    .liability-card { background: var(--card-bg); border-radius: 16px; padding: 18px 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+    .liability-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .liability-name { font-size: 15px; font-weight: 700; }
+    .liability-amount { font-size: 20px; font-weight: 800; text-align: right; }
+    .liability-amount small { font-size: 12px; color: var(--text-light); font-weight: 400; }
+    .liability-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .liability-meta-item { text-align: center; background: var(--bg); border-radius: 10px; padding: 8px 4px; }
+    .liability-meta-label { font-size: 10px; color: var(--text-light); margin-bottom: 2px; }
+    .liability-meta-value { font-size: 13px; font-weight: 600; }
+    .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.5s ease; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-light); margin-top: 6px; }
+    .auto-tag { display: inline-block; font-size: 10px; background: var(--success); color: white; padding: 2px 8px; border-radius: 8px; margin-left: 6px; }
+    .manual-tag { display: inline-block; font-size: 10px; background: #e0e0e0; color: #666; padding: 2px 8px; border-radius: 8px; margin-left: 6px; }
+    .update-btn { width: 100%; height: 40px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 12px; font-size: 13px; color: var(--primary); font-weight: 600; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
+    .update-btn:active { background: #ede0d4; }
+
+    /* ===== REPAYMENT ===== */
+    .target-card { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border-radius: 20px; padding: 24px 20px; margin-bottom: 16px; text-align: center; }
+    .target-label { font-size: 13px; opacity: 0.85; margin-bottom: 8px; }
+    .target-amount { font-size: 36px; font-weight: 800; margin-bottom: 4px; }
+    .target-sub { font-size: 12px; opacity: 0.75; }
+    .progress-big { height: 12px; background: rgba(255,255,255,0.3); border-radius: 6px; overflow: hidden; margin: 16px 0; }
+    .progress-big-fill { height: 100%; background: white; border-radius: 6px; transition: width 0.5s ease; }
+    .progress-big-label { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.85; }
+    .countdown { margin-top: 12px; background: rgba(255,255,255,0.15); border-radius: 12px; padding: 12px; }
+    .countdown-label { font-size: 11px; opacity: 0.75; margin-bottom: 4px; }
+    .countdown-value { font-size: 22px; font-weight: 700; }
+    .record-card { background: var(--card-bg); border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+    .record-title { font-size: 13px; color: var(--text-light); margin-bottom: 10px; }
+    .record-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .record-item:last-child { border-bottom: none; }
+    .record-date { color: var(--text-light); font-size: 13px; }
+    .record-loan { background: #fff3e0; color: #e67e22; padding: 2px 8px; border-radius: 8px; font-size: 11px; }
+    .record-amount { font-weight: 700; color: var(--danger); }
+    .no-record { text-align: center; color: var(--text-light); font-size: 13px; padding: 20px 0; }
+    .add-record-btn { width: 100%; height: 44px; background: var(--primary); color: white; border: none; border-radius: 14px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+
+    /* ===== TIMELINE ===== */
+    .timeline { position: relative; padding-left: 24px; }
+    .timeline::before { content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .timeline-item { position: relative; margin-bottom: 16px; }
+    .timeline-dot { position: absolute; left: -24px; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--border); border: 3px solid var(--bg); }
+    .timeline-dot.done { background: var(--success); }
+    .timeline-dot.active { background: var(--primary); }
+    .timeline-date { font-size: 11px; color: var(--text-light); margin-bottom: 2px; }
+    .timeline-content { font-size: 13px; font-weight: 600; }
+    .timeline-detail { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+
+    /* ===== MODAL ===== */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: none; align-items: flex-end; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--card-bg); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 24px 20px; animation: slideUp 0.25s ease; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .modal-title { font-size: 17px; font-weight: 700; }
+    .modal-close { width: 32px; height: 32px; border-radius: 50%; background: var(--bg); border: none; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-light); }
+    .form-group { margin-bottom: 16px; }
+    .form-label { font-size: 13px; color: var(--text-light); margin-bottom: 6px; display: block; }
+    .form-input, .form-select { width: 100%; height: 48px; border: 1.5px solid var(--border); border-radius: 12px; padding: 0 14px; font-size: 15px; outline: none; background: var(--card-bg); color: var(--text); transition: border-color 0.2s; }
+    .form-input:focus, .form-select:focus { border-color: var(--primary); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-submit { width: 100%; height: 50px; background: var(--primary); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    .form-submit:active { opacity: 0.85; }
+    .form-submit:disabled { background: #ccc; cursor: not-allowed; }
+    .form-delete { width: 100%; height: 44px; background: white; color: var(--danger); border: 1.5px solid var(--danger); border-radius: 14px; font-size: 14px; cursor: pointer; margin-top: 10px; }
+
+    /* ===== TOAST ===== */
+    .toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%) translateY(-20px); background: var(--text); color: white; padding: 10px 20px; border-radius: 24px; font-size: 13px; opacity: 0; transition: all 0.3s; z-index: 300; pointer-events: none; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ===== SYNC INDICATOR ===== */
+    .sync-badge { font-size: 11px; color: var(--text-light); background: var(--bg); padding: 4px 10px; border-radius: 10px; display: flex; align-items: center; gap: 4px; }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .sync-dot.cloud { background: var(--success); }
+    .sync-dot.local { background: #f0ad4e; }
+    .logout-btn { background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
+    .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo">📒</div>
+  <div style="font-size:20px;font-weight:700">家庭手账</div>
+  <div class="loading-text" id="loadingText">正在连接云端...</div>
+  <div class="loading-spinner"></div>
+</div>
+
+<!-- LOGIN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-logo">📒</div>
+  <div class="login-title">家庭手账</div>
+  <div class="login-sub">记录家庭财务，一起努力</div>
+  <input class="login-input" type="password" id="loginInput" placeholder="请输入密码" maxlength="20" autocomplete="off" />
+  <button class="login-btn" id="loginBtn">进入</button>
+  <div class="login-hint">私密财务工具，仅家人可用</div>
+  <div class="login-error" id="loginError">密码错误</div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="header-title" id="pageTitle">资产负债</div>
+      <div class="header-date" id="headerDate"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="sync-badge"><div class="sync-dot cloud" id="syncDot"></div><span id="syncText">已同步</span></div>
+      <button class="logout-btn" onclick="logout()" title="退出">🔒</button>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: HOME ===== -->
+  <div class="page active" id="page-home">
+    <div class="summary-grid" style="margin-bottom:4px">
+      <div class="summary-item">
+        <div class="summary-label">总资产</div>
+        <div class="summary-value positive" id="totalAssets">--</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">总负债</div>
+        <div class="summary-value negative" id="totalLiabilities">--</div>
+      </div>
+    </div>
+    <div class="card" style="text-align:center;margin-bottom:16px">
+      <div class="summary-label" style="margin-bottom:4px">净资产</div>
+      <div class="summary-amount net" id="netAssets">--</div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">资产分布（按类型）</div>
+        <div class="chart-wrap">
+          <canvas id="assetPie" width="240" height="240" style="width:120px;height:120px"></canvas>
+          <div class="chart-center">
+            <div class="chart-center-amount" id="assetPieCenter">--</div>
+            <div class="chart-center-label">总计</div>
+          </div>
+        </div>
+        <div class="chart-legend" id="assetLegend"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">负债构成</div>
+        <div class="chart-wrap">
+          <canvas id="liabilityPie" width="240" height="240" style="width:120px;height:120px"></canvas>
+          <div class="chart-center">
+            <div class="chart-center-amount" id="liabilityPieCenter">--</div>
+            <div class="chart-center-label">总计</div>
+          </div>
+        </div>
+        <div class="chart-legend" id="liabilityLegend"></div>
+      </div>
+    </div>
+    <div class="card-footer" style="margin-top:12px">最后更新：<span id="lastUpdated">--</span></div>
+  </div>
+
+  <!-- ===== PAGE: ASSETS ===== -->
+  <div class="page" id="page-assets">
+    <div class="card">
+      <div class="card-title">💼 资产列表</div>
+      <div class="section-header">
+        <span class="section-title">蔡伟林</span>
+        <span class="section-total" id="assets-cai-total">--</span>
+      </div>
+      <div id="assets-cai-list"></div>
+      <div class="section-header" style="margin-top:16px">
+        <span class="section-title">孙泳茵</span>
+        <span class="section-total" id="assets-sun-total">--</span>
+      </div>
+      <div id="assets-sun-list"></div>
+      <button onclick="openAssetModal()" style="margin:16px auto 0;width:48px;height:48px;font-size:28px;border-radius:50%;background:var(--primary);color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: LIABILITIES ===== -->
+  <div class="page" id="page-liabilities">
+    <div id="liabilities-list"></div>
+    <div class="card-footer" style="margin-top:12px">中海房贷每月自动更新，9A/9C 点击更新按钮手动调整</div>
+  </div>
+
+  <!-- ===== PAGE: REPAYMENT ===== -->
+  <div class="page" id="page-repayment">
+    <!-- 只进不出 Target -->
+    <div class="target-card">
+      <div class="target-label">只进不出账户</div>
+      <div class="target-amount" id="jinzhuan-amount">--</div>
+      <div class="target-sub">当前余额</div>
+      <div class="progress-big">
+        <div class="progress-big-fill" id="target-fill" style="width:0%"></div>
+      </div>
+      <div class="progress-big-label">
+        <span id="target-current">--</span>
+        <span>目标 70万</span>
+      </div>
+      <div class="countdown">
+        <div class="countdown-label">距离下次还款（50万）还差</div>
+        <div class="countdown-value" id="countdown-value">--</div>
+      </div>
+    </div>
+
+    <!-- 提前还款记录 -->
+    <div class="record-card">
+      <div class="record-title">📝 提前还款记录</div>
+      <div id="repayment-records"></div>
+      <button class="add-record-btn" onclick="openRepaymentModal()">+ 记一笔提前还款</button>
+    </div>
+
+    <!-- 还款时间表 -->
+    <div class="card">
+      <div class="card-title">🗓️ 还款计划</div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('home')" id="nav-home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      概览
+    </button>
+    <button class="nav-item" onclick="switchTab('assets')" id="nav-assets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      资产
+    </button>
+    <button class="nav-item" onclick="switchTab('liabilities')" id="nav-liabilities">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 17l10-8 10 8M2 12h20M6 7v5M18 7v5"/></svg>
+      负债
+    </button>
+    <button class="nav-item" onclick="switchTab('repayment')" id="nav-repayment">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h6"/></svg>
+      还款
+    </button>
+  </nav>
+
+</div>
+
+<!-- ===== ASSET MODAL ===== -->
+<div class="modal-overlay" id="assetModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="assetModalTitle">新增资产</div>
+      <button class="modal-close" onclick="closeModal('assetModal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">持有人</label>
+      <select class="form-select" id="assetOwner">
+        <option value="蔡伟林">蔡伟林</option>
+        <option value="孙泳茵">孙泳茵</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">账户名称</label>
+      <input class="form-input" id="assetName" placeholder="如：招行基金、只进不出" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">金额（万）</label>
+      <input class="form-input" id="assetAmount" type="number" step="0.01" placeholder="0.00" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">类型</label>
+      <select class="form-select" id="assetType">
+        <option value="现金">现金（随时可用）</option>
+        <option value="基金">基金</option>
+        <option value="股票">股票</option>
+        <option value="保险">保险</option>
+        <option value="理财">理财（不能随时用）</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注（选填）</label>
+      <input class="form-input" id="assetNote" placeholder="如：Lump Sum 还款专用" />
+    </div>
+    <button class="form-submit" id="assetSubmitBtn" onclick="saveAsset()">保存</button>
+    <button class="form-delete" id="assetDeleteBtn" onclick="deleteAsset()" style="display:none">删除</button>
+  </div>
+</div>
+
+<!-- ===== LIABILITY MODAL ===== -->
+<div class="modal-overlay" id="liabilityModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="liabilityModalTitle">更新负债</div>
+      <button class="modal-close" onclick="closeModal('liabilityModal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">贷款名称</label>
+      <input class="form-input" id="liabilityNameDisplay" disabled style="background:var(--bg);color:var(--text-light)" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">当前剩余本金（万）</label>
+      <input class="form-input" id="liabilityPrincipal" type="number" step="0.01" placeholder="0.00" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注（选填）</label>
+      <input class="form-input" id="liabilityNote" placeholder="如：刚提前还了50万" />
+    </div>
+    <button class="form-submit" onclick="saveLiability()">保存</button>
+  </div>
+</div>
+
+<!-- ===== REPAYMENT RECORD MODAL ===== -->
+<div class="modal-overlay" id="repaymentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">记一笔提前还款</div>
+      <button class="modal-close" onclick="closeModal('repaymentModal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">还款日期</label>
+      <input class="form-input" id="repaymentDate" type="date" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">还款金额（万）</label>
+        <input class="form-input" id="repaymentAmount" type="number" step="0.01" value="50" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">还入贷款</label>
+        <select class="form-select" id="repaymentLoan">
+          <option value="9A">9A抵押贷</option>
+          <option value="9C">9C抵押贷</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注（选填）</label>
+      <input class="form-input" id="repaymentNote" placeholder="如：第一次提前还款" />
+    </div>
+    <button class="form-submit" onclick="saveRepayment()">保存</button>
+  </div>
+</div>
+
+<!-- SUPABASE -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ===== SUPABASE CONFIG =====
+const SUPABASE_URL = 'https://drefdurkgslsfbvkqqda.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRyZWZkdXJrZ3Nsc2ZidmtxcWRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDM4ODUsImV4cCI6MjA5MTM3OTg4NX0._LrakzxpXziufGyxcswnrLU2jHtB21c23dTPGzZ-Y-c';
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===== STATE =====
+let data = {
+  assets: [],
+  liabilities: [],
+  repayment_records: [],
+  meta: {}
+};
+let editingAssetId = null;
+let editingLiabilityId = null;
+let isLoading = true;
+let saveTimeout = null;
+
+// ===== INIT =====
+async function init() {
+  // Try to load from Supabase first, with timeout
+  const timeoutPromise = new Promise(resolve => setTimeout(() => {
+    document.getElementById('loadingText').textContent = '云端连接慢，使用本地数据...';
+    resolve('timeout');
+  }, 5000));
+  
+  const loadPromise = loadFromSupabase().then(() => 'loaded');
+  await Promise.race([loadPromise, timeoutPromise]);
+  
+  // Show login regardless
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginInput').addEventListener('keyup', e => { if (e.key === 'Enter') checkLogin(); });
+  document.getElementById('loginBtn').onclick = checkLogin;
+}
+
+// ===== SUPABASE =====
+async function loadFromSupabase() {
+  try {
+    const [assetsRes, liabilitiesRes, recordsRes, metaRes] = await Promise.all([
+      supabase.from('assets').select('*'),
+      supabase.from('liabilities').select('*'),
+      supabase.from('repayment_records').select('*').order('date', { ascending: false }),
+      supabase.from('meta').select('*').eq('id', 'main').single()
+    ]);
+
+    data.assets = assetsRes.data || [];
+    data.liabilities = liabilitiesRes.data || [];
+    data.repayment_records = recordsRes.data || [];
+    data.meta = metaRes.data || { id: 'main', last_updated: '', next_repayment_target: 70, repayment_amount: 50 };
+
+    // If empty, seed default data
+    if (data.assets.length === 0) {
+      await seedDefaultData();
+    }
+
+    // Auto-update 中海
+    autoUpdateZhonghai();
+    await syncLiabilitiesToSupabase();
+
+  } catch (err) {
+    console.error('Supabase load error:', err);
+    loadFromLocalStorage();
+  }
+}
+
+async function seedDefaultData() {
+  const defaultAssets = [
+    { id: 'a1', owner: '蔡伟林', name: '只进不出', amount: 53, type: '现金', note: 'Lump Sum 还款专用账户', updated_at: '2026-04-10' },
+    { id: 'a2', owner: '蔡伟林', name: '招行基金', amount: 8, type: '基金', note: '', updated_at: '2026-04-10' },
+    { id: 'a3', owner: '蔡伟林', name: '招行理财', amount: 12, type: '理财', note: '', updated_at: '2026-04-10' },
+    { id: 'a4', owner: '蔡伟林', name: '招行现金', amount: 1.6, type: '现金', note: '', updated_at: '2026-04-10' },
+    { id: 'a5', owner: '蔡伟林', name: '信诺保险', amount: 5, type: '保险', note: '', updated_at: '2026-04-10' },
+    { id: 'a6', owner: '孙泳茵', name: '股票', amount: 77.2, type: '股票', note: '', updated_at: '2026-02' },
+    { id: 'a7', owner: '孙泳茵', name: '支付宝', amount: 41.7, type: '基金', note: '基金+黄金+余额宝', updated_at: '2026-02' },
+    { id: 'a8', owner: '孙泳茵', name: '招行基金', amount: 13.2, type: '基金', note: '', updated_at: '2026-02' },
+    { id: 'a9', owner: '孙泳茵', name: '招行泰康保险', amount: 36, type: '保险', note: '', updated_at: '2026-02' },
+    { id: 'a10', owner: '孙泳茵', name: '招行快赎', amount: 6.3, type: '现金', note: '', updated_at: '2026-02' },
+    { id: 'a11', owner: '孙泳茵', name: '农行卡余额', amount: 6.3, type: '现金', note: '', updated_at: '2026-02' },
+    { id: 'a12', owner: '孙泳茵', name: '招行卡余额', amount: 5.5, type: '现金', note: '', updated_at: '2026-02' },
+    { id: 'a13', owner: '孙泳茵', name: '东莞银行卡余额', amount: 5.3, type: '现金', note: '', updated_at: '2026-02' },
+    { id: 'a14', owner: '孙泳茵', name: '微信基金', amount: 1.3, type: '基金', note: '', updated_at: '2026-02' },
+    { id: 'a15', owner: '孙泳茵', name: '建行基金', amount: 0.6, type: '基金', note: '', updated_at: '2026-02' },
+    { id: 'a16', owner: '孙泳茵', name: '东莞农商行余额', amount: 0.6, type: '现金', note: '', updated_at: '2026-02' },
+    { id: 'a17', owner: '孙泳茵', name: '建行卡余额', amount: 0.06, type: '现金', note: '', updated_at: '2026-02' },
+  ];
+
+  const defaultLiabilities = [
+    { id: 'l1', name: '9A抵押贷', principal: 460, rate: 3.55, monthly_interest: 1.36, monthly_payment: 0, repayment_type: '先息后本', update_mode: 'manual', due_date: '每年续期', note: '' },
+    { id: 'l2', name: '9C抵押贷', principal: 380, rate: 3.45, monthly_interest: 1.09, monthly_payment: 0, repayment_type: '先息后本', update_mode: 'manual', due_date: '3年一续', note: '' },
+    { id: 'l3', name: '中海房贷', principal: 320, rate: 3.2, monthly_interest: 0, monthly_payment: 3.2, repayment_type: '本息归还', update_mode: 'auto', due_date: '2035年12月', note: '' },
+  ];
+
+  try {
+    if (defaultAssets.length > 0) await supabase.from('assets').insert(defaultAssets);
+    if (defaultLiabilities.length > 0) await supabase.from('liabilities').insert(defaultLiabilities);
+    await supabase.from('meta').upsert({ id: 'main', last_updated: '2026-04-10', next_repayment_target: 70, repayment_amount: 50 });
+
+    data.assets = defaultAssets;
+    data.liabilities = defaultLiabilities;
+    data.meta = { id: 'main', last_updated: '2026-04-10', next_repayment_target: 70, repayment_amount: 50 };
+  } catch (err) {
+    console.error('Seed error:', err);
+  }
+}
+
+function loadFromLocalStorage() {
+  const stored = localStorage.getItem('family_ledger_data_v1');
+  if (stored) {
+    try { data = JSON.parse(stored); } catch { /* ignore */ }
+  }
+  document.getElementById('syncDot').className = 'sync-dot local';
+  document.getElementById('syncText').textContent = '本地';
+}
+
+function saveToLocalStorage() {
+  localStorage.setItem('family_ledger_data_v1', JSON.stringify(data));
+}
+
+// ===== LOGIN =====
+function checkLogin() {
+  const pwd = document.getElementById('loginInput').value.trim();
+  if (pwd === '1221') {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').classList.add('active');
+    renderAll();
+    // Subscribe to real-time updates
+    subscribeToChanges();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+    document.getElementById('loginInput').value = '';
+    document.getElementById('loginInput').focus();
+    setTimeout(() => { document.getElementById('loginError').style.display = 'none'; }, 2000);
+  }
+}
+
+function logout() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').classList.remove('active');
+  document.getElementById('loginInput').value = '';
+}
+
+// ===== REALTIME =====
+let channel = null;
+function subscribeToChanges() {
+  channel = supabase
+    .channel('family-ledger-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'assets' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'liabilities' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'repayment_records' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'meta' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
+    .subscribe();
+}
+
+async function loadFromSupabaseSilent() {
+  try {
+    const [assetsRes, liabilitiesRes, recordsRes, metaRes] = await Promise.all([
+      supabase.from('assets').select('*'),
+      supabase.from('liabilities').select('*'),
+      supabase.from('repayment_records').select('*').order('date', { ascending: false }),
+      supabase.from('meta').select('*').eq('id', 'main').single()
+    ]);
+    data.assets = assetsRes.data || [];
+    data.liabilities = liabilitiesRes.data || [];
+    data.repayment_records = recordsRes.data || [];
+    data.meta = metaRes.data || {};
+    renderAll();
+  } catch (e) { /* ignore silent refresh errors */ }
+}
+
+// ===== RENDER =====
+function renderAll() {
+  isLoading = false;
+  const today = new Date();
+  document.getElementById('headerDate').textContent = `${today.getMonth()+1}月${today.getDate()}日`;
+  document.getElementById('lastUpdated').textContent = data.meta.last_updated || '--';
+  renderHome();
+  renderAssets();
+  renderLiabilities();
+  renderRepayment();
+}
+
+function fw(v) { return (v || 0).toFixed(1) + '万'; }
+
+// ===== HOME =====
+function renderHome() {
+  const totalAssets = data.assets.reduce((s, a) => s + (a.amount || 0), 0);
+  const totalLiabilities = data.liabilities.reduce((s, l) => s + (l.principal || 0), 0);
+  const netAssets = totalAssets - totalLiabilities;
+
+  document.getElementById('totalAssets').textContent = fw(totalAssets);
+  document.getElementById('totalLiabilities').textContent = fw(totalLiabilities);
+  document.getElementById('netAssets').textContent = fw(netAssets);
+  document.getElementById('netAssets').className = 'summary-amount ' + (netAssets >= 0 ? 'net' : 'negative');
+  document.getElementById('assetPieCenter').textContent = fw(totalAssets);
+  document.getElementById('liabilityPieCenter').textContent = fw(totalLiabilities);
+
+  // 按5类资产分组
+  const ASSET_TYPES = [
+    { key: '现金', label: '现金（随时可用）', color: '#e8b87a' },
+    { key: '基金', label: '基金', color: '#7a9fc8' },
+    { key: '股票', label: '股票', color: '#9b7ac8' },
+    { key: '保险', label: '保险', color: '#7ac8a3' },
+    { key: '理财', label: '理财（不能随时用）', color: '#c87a7a' },
+  ];
+  const typeValues = ASSET_TYPES.map(t => data.assets.filter(a => a.type === t.key).reduce((s, a) => s + (a.amount || 0), 0));
+  const typeItems = ASSET_TYPES.map((t, i) => ({ label: t.label, value: typeValues[i] }));
+  drawPie('assetPie', typeValues, ASSET_TYPES.map(t => t.color), totalAssets, typeItems);
+
+  drawPie('liabilityPie', data.liabilities.map(l => l.principal || 0), ['#e8c87a', '#c87a7a', '#7ab3c8'], totalLiabilities,
+    data.liabilities.map(l => ({ label: l.name, value: l.principal || 0 }))
+  );
+}
+
+function drawPie(canvasId, values, colors, total, legendItems) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const cx = 120, cy = 120, r = 80;
+  ctx.clearRect(0, 0, 240, 240);
+  let start = -Math.PI / 2;
+  values.forEach((v, i) => {
+    if (v <= 0) return;
+    const ratio = v / total;
+    const end = start + ratio * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, end);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    start = end;
+  });
+  const legendId = canvasId === 'assetPie' ? 'assetLegend' : 'liabilityLegend';
+  const legendEl = document.getElementById(legendId);
+  if (!legendEl) return;
+  legendEl.innerHTML = legendItems.map((item, i) => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${colors[i%colors.length]}"></div>
+      <span class="legend-label">${item.label}</span>
+      <span class="legend-value">${fw(item.value)}</span>
+    </div>
+  `).join('');
+}
+
+// ===== ASSETS =====
+function renderAssets() {
+  const cai = data.assets.filter(a => a.owner === '蔡伟林');
+  const sun = data.assets.filter(a => a.owner === '孙泳茵');
+  document.getElementById('assets-cai-total').textContent = fw(cai.reduce((s,a)=>s+(a.amount||0),0));
+  document.getElementById('assets-sun-total').textContent = fw(sun.reduce((s,a)=>s+(a.amount||0),0));
+  document.getElementById('assets-cai-list').innerHTML = cai.map(a => assetCardHTML(a)).join('') || '<div class="empty-state"><div class="empty-state-icon">📭</div>暂无资产</div>';
+  document.getElementById('assets-sun-list').innerHTML = sun.map(a => assetCardHTML(a)).join('') || '<div class="empty-state"><div class="empty-state-icon">📭</div>暂无资产</div>';
+}
+
+function assetCardHTML(a) {
+  const typeColors = { '现金': '#e8f5e9', '基金': '#e3f2fd', '股票': '#fff3e0', '保险': '#fce4ec', '理财': '#f3e5f5', '其他': '#f5f5f5' };
+  const typeTextColors = { '现金': '#2e7d32', '基金': '#1565c0', '股票': '#e65100', '保险': '#c62828', '理财': '#6a1b9a', '其他': '#616161' };
+  const bg = typeColors[a.type] || '#f5f5f5';
+  const tc = typeTextColors[a.type] || '#616161';
+  return `
+    <div class="asset-card" onclick="openAssetModal('${a.id}')">
+      <div class="asset-info">
+        <div class="asset-name">${a.name}</div>
+        <span class="asset-type" style="background:${bg};color:${tc}">${a.type}</span>
+        ${a.note ? `<div style="font-size:11px;color:var(--text-light);margin-top:4px">${a.note}</div>` : ''}
+      </div>
+      <div style="text-align:right">
+        <div class="asset-amount">${fw(a.amount)}</div>
+        <span class="owner-badge ${a.owner==='蔡伟林'?'owner-cai':'owner-sun'}">${a.owner==='蔡伟林'?'伟':'茵'}</span>
+      </div>
+    </div>
+  `;
+}
+
+function openAssetModal(id) {
+  editingAssetId = id;
+  const modal = document.getElementById('assetModal');
+  const title = document.getElementById('assetModalTitle');
+  const deleteBtn = document.getElementById('assetDeleteBtn');
+  const submitBtn = document.getElementById('assetSubmitBtn');
+
+  submitBtn.disabled = false;
+  if (id) {
+    const a = data.assets.find(x => x.id === id);
+    if (!a) return;
+    title.textContent = '编辑资产';
+    deleteBtn.style.display = 'block';
+    document.getElementById('assetOwner').value = a.owner;
+    document.getElementById('assetName').value = a.name;
+    document.getElementById('assetAmount').value = a.amount;
+    document.getElementById('assetType').value = a.type;
+    document.getElementById('assetNote').value = a.note || '';
+  } else {
+    title.textContent = '新增资产';
+    deleteBtn.style.display = 'none';
+    document.getElementById('assetOwner').value = '蔡伟林';
+    document.getElementById('assetName').value = '';
+    document.getElementById('assetAmount').value = '';
+    document.getElementById('assetType').value = '现金';
+    document.getElementById('assetNote').value = '';
+  }
+  modal.classList.add('active');
+}
+
+async function saveAsset() {
+  const owner = document.getElementById('assetOwner').value.trim();
+  const name = document.getElementById('assetName').value.trim();
+  const amount = parseFloat(document.getElementById('assetAmount').value);
+  const type = document.getElementById('assetType').value;
+  const note = document.getElementById('assetNote').value.trim();
+
+  if (!name) { showToast('请输入账户名称'); return; }
+  if (isNaN(amount) || amount < 0) { showToast('请输入正确金额'); return; }
+
+  const submitBtn = document.getElementById('assetSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = '保存中...';
+
+  const now = new Date().toISOString().slice(0, 10);
+
+  try {
+    if (editingAssetId) {
+      const { error } = await supabase.from('assets').update({ owner, name, amount, type, note, updated_at: now }).eq('id', editingAssetId);
+      if (error) throw error;
+      const idx = data.assets.findIndex(a => a.id === editingAssetId);
+      if (idx >= 0) data.assets[idx] = { ...data.assets[idx], owner, name, amount, type, note, updated_at: now };
+      showToast('已更新');
+    } else {
+      const newAsset = { id: 'a' + Date.now(), owner, name, amount, type, note, updated_at: now };
+      const { error } = await supabase.from('assets').insert([newAsset]);
+      if (error) throw error;
+      data.assets.push(newAsset);
+      showToast('已添加');
+    }
+    closeModal('assetModal');
+    renderAll();
+    await updateMetaTimestamp();
+  } catch (err) {
+    console.error('Save asset error:', err);
+    showToast('保存失败');
+    submitBtn.disabled = false;
+    submitBtn.textContent = '保存';
+  }
+}
+
+async function deleteAsset() {
+  if (!editingAssetId) return;
+  if (!confirm('确定要删除这个资产吗？')) return;
+  try {
+    const { error } = await supabase.from('assets').delete().eq('id', editingAssetId);
+    if (error) throw error;
+    data.assets = data.assets.filter(a => a.id !== editingAssetId);
+    closeModal('assetModal');
+    renderAll();
+    await updateMetaTimestamp();
+    showToast('已删除');
+  } catch (err) {
+    console.error('Delete asset error:', err);
+    showToast('删除失败');
+  }
+}
+
+// ===== LIABILITIES =====
+function renderLiabilities() {
+  const list = document.getElementById('liabilities-list');
+  list.innerHTML = data.liabilities.map(l => `
+    <div class="liability-card">
+      <div class="liability-header">
+        <div>
+          <div class="liability-name">${l.name}</div>
+          <span class="${l.update_mode === 'auto' ? 'auto-tag' : 'manual-tag'}">${l.update_mode === 'auto' ? '自动' : '手动'}</span>
+          ${l.note ? `<div style="font-size:11px;color:var(--text-light);margin-top:4px">${l.note}</div>` : ''}
+        </div>
+        <div class="liability-amount">${fw(l.principal)}<small>万</small></div>
+      </div>
+      <div class="liability-meta">
+        <div class="liability-meta-item">
+          <div class="liability-meta-label">利率</div>
+          <div class="liability-meta-value">${l.rate}%</div>
+        </div>
+        <div class="liability-meta-item">
+          <div class="liability-meta-label">${l.update_mode === 'auto' ? '月供' : '月利息'}</div>
+          <div class="liability-meta-value">${fw(l.update_mode === 'auto' ? (l.monthly_payment || 0) : (l.monthly_interest || 0))}</div>
+        </div>
+        <div class="liability-meta-item">
+          <div class="liability-meta-label">到期</div>
+          <div class="liability-meta-value" style="font-size:11px">${l.due_date}</div>
+        </div>
+      </div>
+      ${l.update_mode === 'manual' ? `<button class="update-btn" onclick="openLiabilityModal('${l.id}')">✏️ 更新剩余本金</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function openLiabilityModal(id) {
+  editingLiabilityId = id;
+  const l = data.liabilities.find(x => x.id === id);
+  if (!l) return;
+  document.getElementById('liabilityNameDisplay').value = l.name;
+  document.getElementById('liabilityPrincipal').value = l.principal;
+  document.getElementById('liabilityNote').value = l.note || '';
+  document.getElementById('liabilityModal').classList.add('active');
+}
+
+async function saveLiability() {
+  const principal = parseFloat(document.getElementById('liabilityPrincipal').value);
+  const note = document.getElementById('liabilityNote').value.trim();
+  if (isNaN(principal) || principal < 0) { showToast('请输入正确金额'); return; }
+
+  const l = data.liabilities.find(x => x.id === editingLiabilityId);
+  if (!l) return;
+
+  const newInterest = parseFloat((principal * l.rate / 100 / 12).toFixed(2));
+
+  try {
+    const { error } = await supabase.from('liabilities').update({ principal, monthly_interest: newInterest, note }).eq('id', editingLiabilityId);
+    if (error) throw error;
+    Object.assign(l, { principal, monthly_interest: newInterest, note });
+    closeModal('liabilityModal');
+    renderAll();
+    await updateMetaTimestamp();
+    showToast('已更新');
+  } catch (err) {
+    console.error('Save liability error:', err);
+    showToast('保存失败');
+  }
+}
+
+// ===== REPAYMENT =====
+function renderRepayment() {
+  const jinzhuan = data.assets.find(a => a.name === '只进不出');
+  const current = jinzhuan ? (jinzhuan.amount || 0) : 0;
+  const target = data.meta.next_repayment_target || 70;
+  const pct = Math.min(100, (current / target) * 100);
+  const diff = target - current;
+
+  document.getElementById('jinzhuan-amount').textContent = fw(current);
+  document.getElementById('target-current').textContent = fw(current);
+  document.getElementById('target-fill').style.width = pct + '%';
+  document.getElementById('countdown-value').textContent = fw(Math.max(0, diff));
+
+  const recordsEl = document.getElementById('repayment-records');
+  if (!data.repayment_records || data.repayment_records.length === 0) {
+    recordsEl.innerHTML = '<div class="no-record">暂无还款记录，加油！</div>';
+  } else {
+    recordsEl.innerHTML = data.repayment_records.map(r => `
+      <div class="record-item">
+        <div>
+          <div style="font-weight:600">${fw(r.amount)} → ${r.loan}</div>
+          <div class="record-date">${r.date} ${r.note ? '· ' + r.note : ''}</div>
+        </div>
+        <span class="record-loan">${r.loan}</span>
+      </div>
+    `).join('');
+  }
+
+  renderTimeline();
+}
+
+function openRepaymentModal() {
+  document.getElementById('repaymentDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('repaymentAmount').value = data.meta.repayment_amount || 50;
+  document.getElementById('repaymentLoan').value = '9A';
+  document.getElementById('repaymentNote').value = '';
+  document.getElementById('repaymentModal').classList.add('active');
+}
+
+async function saveRepayment() {
+  const date = document.getElementById('repaymentDate').value;
+  const amount = parseFloat(document.getElementById('repaymentAmount').value);
+  const loan = document.getElementById('repaymentLoan').value;
+  const note = document.getElementById('repaymentNote').value.trim();
+
+  if (!date) { showToast('请选择日期'); return; }
+  if (isNaN(amount) || amount <= 0) { showToast('请输入正确金额'); return; }
+
+  try {
+    // 1. Save repayment record
+    const newRecord = { id: 'r' + Date.now(), date, amount, loan, note };
+    const { error: recordErr } = await supabase.from('repayment_records').insert([newRecord]);
+    if (recordErr) throw recordErr;
+    data.repayment_records.unshift(newRecord);
+
+    // 2. Deduct from 只进不出
+    const jinzhuan = data.assets.find(a => a.name === '只进不出');
+    if (jinzhuan) {
+      const newAmount = Math.max(0, (jinzhuan.amount || 0) - amount);
+      const { error: assetErr } = await supabase.from('assets').update({ amount: newAmount, updated_at: date }).eq('id', jinzhuan.id);
+      if (assetErr) throw assetErr;
+      jinzhuan.amount = newAmount;
+      jinzhuan.updated_at = date;
+    }
+
+    // 3. Reduce liability principal
+    const liability = data.liabilities.find(l => l.name.includes(loan));
+    if (liability) {
+      const newPrincipal = Math.max(0, (liability.principal || 0) - amount);
+      const newInterest = parseFloat((newPrincipal * liability.rate / 100 / 12).toFixed(2));
+      const { error: liabErr } = await supabase.from('liabilities').update({ principal: newPrincipal, monthly_interest: newInterest, note }).eq('id', liability.id);
+      if (liabErr) throw liabErr;
+      liability.principal = newPrincipal;
+      liability.monthly_interest = newInterest;
+    }
+
+    closeModal('repaymentModal');
+    renderAll();
+    await updateMetaTimestamp();
+    showToast(`已记录还款 ${fw(amount)} → ${loan}`);
+  } catch (err) {
+    console.error('Save repayment error:', err);
+    showToast('保存失败');
+  }
+}
+
+function renderTimeline() {
+  const now = new Date();
+  const jinzhuan = data.assets.find(a => a.name === '只进不出');
+  const current = jinzhuan ? (jinzhuan.amount || 0) : 0;
+  const target = data.meta.next_repayment_target || 70;
+  const monthlySave = 3.0;
+  const monthsTo70 = Math.max(0, Math.ceil((target - current) / monthlySave));
+  const targetDate = new Date(now);
+  targetDate.setMonth(targetDate.getMonth() + monthsTo70);
+
+  const count9A = (data.repayment_records || []).filter(r => r.loan === '9A').length;
+  const count9C = (data.repayment_records || []).filter(r => r.loan === '9C').length;
+
+  const l9A = data.liabilities.find(l => l.name === '9A抵押贷');
+  const l9C = data.liabilities.find(l => l.name === '9C抵押贷');
+  const lZhong = data.liabilities.find(l => l.name === '中海房贷');
+
+  const timeline = [
+    {
+      date: '~' + targetDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short' }),
+      content: '存够' + fw(target) + '，提前还50万',
+      detail: `只进不出当前${fw(current)}，距离目标${fw(target)}`,
+      done: current >= target,
+      active: false
+    },
+    {
+      date: '2031年前后',
+      content: '9A抵押贷清零',
+      detail: `剩余 ${fw(l9A ? l9A.principal : 460)}（已还${count9A}次）`,
+      done: (l9A ? l9A.principal : 460) <= 0,
+      active: (l9A ? l9A.principal : 460) > 0 && (l9A ? l9A.principal : 460) < 300
+    },
+    {
+      date: '2035年6月前后',
+      content: '9C抵押贷清零',
+      detail: `剩余 ${fw(l9C ? l9C.principal : 380)}（已还${count9C}次）`,
+      done: (l9C ? l9C.principal : 380) <= 0,
+      active: false
+    },
+    {
+      date: '2035年12月',
+      content: '中海房贷到期还清',
+      detail: `到期本金 ${fw(lZhong ? lZhong.principal : 320)}`,
+      done: false,
+      active: false
+    },
+  ];
+
+  const timelineEl = document.getElementById('timeline');
+  if (timelineEl) {
+    timelineEl.innerHTML = timeline.map(item => `
+      <div class="timeline-item">
+        <div class="timeline-dot ${item.done ? 'done' : item.active ? 'active' : ''}"></div>
+        <div class="timeline-date">${item.date}</div>
+        <div class="timeline-content">${item.content}</div>
+        <div class="timeline-detail">${item.detail}</div>
+      </div>
+    `).join('');
+  }
+}
+
+// ===== AUTO UPDATE 中海 =====
+function autoUpdateZhonghai() {
+  const zhonghai = data.liabilities.find(l => l.name === '中海房贷');
+  if (!zhonghai || zhonghai.update_mode !== 'auto') return;
+  const now = new Date();
+  const dueDate = new Date('2035-12-01');
+  if (now >= dueDate) return;
+  const monthlyPayment = zhonghai.monthly_payment || 3.2;
+  const annualRate = (zhonghai.rate || 3.2) / 100;
+  const monthlyInterest = (zhonghai.principal || 0) * annualRate / 12;
+  const monthlyPrincipal = monthlyPayment - monthlyInterest;
+  if (monthlyPrincipal > 0 && zhonghai.principal > 0) {
+    zhonghai.principal = Math.max(0, zhonghai.principal - monthlyPrincipal);
+  }
+}
+
+async function syncLiabilitiesToSupabase() {
+  try {
+    for (const l of data.liabilities) {
+      await supabase.from('liabilities').update({ principal: l.principal, monthly_interest: l.monthly_interest }).eq('id', l.id);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function updateMetaTimestamp() {
+  const now = new Date().toISOString().slice(0, 10);
+  data.meta.last_updated = now;
+  try {
+    await supabase.from('meta').update({ last_updated: now }).eq('id', 'main');
+  } catch (e) { /* ignore */ }
+}
+
+// ===== NAVIGATION =====
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  document.getElementById('nav-' + tab).classList.add('active');
+  const titles = { home: '资产负债', assets: '资产列表', liabilities: '负债追踪', repayment: '还款计划' };
+  document.getElementById('pageTitle').textContent = titles[tab];
+}
+
+// ===== MODAL =====
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+  editingAssetId = null;
+  editingLiabilityId = null;
+}
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('active');
+  });
+});
+
+// ===== TOAST =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ===== START =====
+init();
+</script>
+</body>
+</html>
