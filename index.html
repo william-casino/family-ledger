@@ -471,7 +471,7 @@ let saveTimeout = null;
 // ===== INIT =====
 async function init() {
   // Show loading state
-  const loadingText = document.getElementById('loadingText');
+  const loadingText = document.getElementById('loadingText') || { textContent: () => {} };
   
   // Start timeout countdown
   let countdown = 5;
@@ -485,7 +485,7 @@ async function init() {
   // Try to load from Supabase, with timeout
   const timeoutPromise = new Promise(resolve => setTimeout(() => {
     clearInterval(countdownInterval);
-    loadingText.textContent = '云端连接超时，使用本地数据...';
+    if (loadingText.textContent) loadingText.textContent = '云端连接超时，使用本地数据...';
     resolve('timeout');
   }, 5000));
   
@@ -533,9 +533,9 @@ async function loadFromSupabase() {
       await seedDefaultData();
     }
 
-    // Auto-update 中海
+    // Auto-update 中海 (don't block on sync)
     autoUpdateZhonghai();
-    await syncLiabilitiesToSupabase();
+    syncLiabilitiesToSupabase().catch(() => {}); // fire and forget
 
   } catch (err) {
     console.error('Supabase load error:', err);
