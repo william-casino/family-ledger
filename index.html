@@ -470,14 +470,29 @@ let saveTimeout = null;
 
 // ===== INIT =====
 async function init() {
-  // Try to load from Supabase first, with timeout
+  // Show loading state
+  const loadingText = document.getElementById('loadingText');
+  
+  // Start timeout countdown
+  let countdown = 5;
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    if (countdown > 0) {
+      loadingText.textContent = `连接中...${countdown}s`;
+    }
+  }, 1000);
+  
+  // Try to load from Supabase, with timeout
   const timeoutPromise = new Promise(resolve => setTimeout(() => {
-    document.getElementById('loadingText').textContent = '云端连接慢，使用本地数据...';
+    clearInterval(countdownInterval);
+    loadingText.textContent = '云端连接超时，使用本地数据...';
     resolve('timeout');
   }, 5000));
   
-  const loadPromise = loadFromSupabase().then(() => 'loaded');
+  const loadPromise = loadFromSupabase().then(() => 'loaded').catch(() => 'error');
   await Promise.race([loadPromise, timeoutPromise]);
+  
+  clearInterval(countdownInterval);
   
   // Show login regardless
   document.getElementById('loadingScreen').style.display = 'none';
@@ -489,17 +504,29 @@ async function init() {
 // ===== SUPABASE =====
 async function loadFromSupabase() {
   try {
-    const [assetsRes, liabilitiesRes, recordsRes, metaRes] = await Promise.all([
+    // Load assets and liabilities first (most important)
+    const [assetsRes, liabilitiesRes] = await Promise.all([
       supabase.from('assets').select('*'),
-      supabase.from('liabilities').select('*'),
-      supabase.from('repayment_records').select('*').order('date', { ascending: false }),
-      supabase.from('meta').select('*').eq('id', 'main').single()
+      supabase.from('liabilities').select('*')
     ]);
-
+    
     data.assets = assetsRes.data || [];
     data.liabilities = liabilitiesRes.data || [];
-    data.repayment_records = recordsRes.data || [];
-    data.meta = metaRes.data || { id: 'main', last_updated: '', next_repayment_target: 70, repayment_amount: 50 };
+    
+    // Try to load optional tables with individual timeouts
+    try {
+      const recordsRes = await supabase.from('repayment_records').select('*').order('date', { ascending: false });
+      data.repayment_records = recordsRes.data || [];
+    } catch (e) {
+      data.repayment_records = [];
+    }
+    
+    try {
+      const metaRes = await supabase.from('meta').select('*').eq('id', 'main').single();
+      data.meta = metaRes.data || { id: 'main', last_updated: '', next_repayment_target: 70, repayment_amount: 50 };
+    } catch (e) {
+      data.meta = { id: 'main', last_updated: '', next_repayment_target: 70, repayment_amount: 50 };
+    }
 
     // If empty, seed default data
     if (data.assets.length === 0) {
@@ -594,28 +621,32 @@ function logout() {
 
 // ===== REALTIME =====
 let channel = null;
+let realtimeEnabled = false;
 function subscribeToChanges() {
-  channel = supabase
-    .channel('family-ledger-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'assets' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'liabilities' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'repayment_records' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'meta' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
-    .subscribe();
+  // Fire and forget - don't await or block
+  setTimeout(() => {
+    try {
+      channel = supabase
+        .channel('family-ledger-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'assets' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'liabilities' }, () => { if (!isLoading) loadFromSupabaseSilent(); })
+        .subscribe();
+      realtimeEnabled = true;
+    } catch (e) {
+      console.warn('Realtime subscription failed:', e);
+      realtimeEnabled = false;
+    }
+  }, 2000); // Delay 2s to let initial load complete first
 }
 
 async function loadFromSupabaseSilent() {
   try {
-    const [assetsRes, liabilitiesRes, recordsRes, metaRes] = await Promise.all([
+    const [assetsRes, liabilitiesRes] = await Promise.all([
       supabase.from('assets').select('*'),
-      supabase.from('liabilities').select('*'),
-      supabase.from('repayment_records').select('*').order('date', { ascending: false }),
-      supabase.from('meta').select('*').eq('id', 'main').single()
+      supabase.from('liabilities').select('*')
     ]);
     data.assets = assetsRes.data || [];
     data.liabilities = liabilitiesRes.data || [];
-    data.repayment_records = recordsRes.data || [];
-    data.meta = metaRes.data || {};
     renderAll();
   } catch (e) { /* ignore silent refresh errors */ }
 }
